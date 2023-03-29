@@ -1,1 +1,1 @@
-flask --app ./src/router.py run --debug
+flask --app ./src/router.py run --debug -h 0.0.0.0

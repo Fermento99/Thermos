@@ -1,1 +1,1 @@
-curl -X GET localhost:5000/temperature/history/pawel/10
+curl -X GET "localhost:5000/api/temperature?room=bedroom&limit=1"

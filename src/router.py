@@ -11,24 +11,36 @@ db.init_app(app)
 def index():
     return render_template('index.html')
 
-@app.get('/temperature/now')
-def get_temp_now():
+@app.get('/api/temperature')
+def get_temperature():
     # TODO: handle errors
-    entry = db.session.execute(db.select(History, History.bathroom).order_by(History.time.desc())).scalars()
-    # print(entry.to_dict())
-    for obj in entry:
-        print(obj)
-    return ''
+    args = request.args
+    if 'room' in args.keys():
+        try: 
+            if 'limit' in args.keys():
+                return History.get_history(room=args['room'], limit=int(args['limit']))
+            else:
+                return History.get_history(room=args['room'], limit=12)
+        except Exception as error:
+            print(error)
+            abort(400, error)
+    
+    return History.get_now()
 
-@app.get('/temperature/history/<room>/<int:limit>')
-def get_history(room, limit):
-    # TODO: inplement
-    abort(501)
 
-@app.post('/temperature')
+@app.post('/api/temperature')
 def new_temp():
     # TODO: handle errors
-    entry = History(**request.get_json())
-    db.session.add(entry)
-    db.session.commit()
-    return '', 201
+    try:
+        entry = History(**request.get_json())
+        db.session.add(entry)
+        db.session.commit()
+        return '', 201
+    except Exception as error:
+        print(error)
+        abort(400, error)
+
+
+@app.errorhandler(400)
+def error400(error):
+    return error, 400
