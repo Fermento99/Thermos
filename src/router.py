@@ -1,11 +1,11 @@
-from flask import Flask, render_template, request, abort, jsonify
-from db.db import db
-from db.models.history import History
-import config
+from flask import Flask, render_template, request, abort
+from sqlalchemy.orm import scoped_session
+from db import SessionLocal
+from models.temperature_status import TemperatureStatus
+
 
 app = Flask(__name__, template_folder="../frontend/build", static_folder="../frontend/build/static")
-app.config.from_prefixed_env()
-db.init_app(app)
+db_session = scoped_session(SessionLocal)
 
 @app.get("/")
 def index():
@@ -18,23 +18,23 @@ def get_temperature():
     if 'room' in args.keys():
         try: 
             if 'limit' in args.keys():
-                return History.get_history(room=args['room'], limit=int(args['limit']))
+                return TemperatureStatus.get_history(db_session, room=args['room'], limit=int(args['limit']))
             else:
-                return History.get_history(room=args['room'], limit=12)
+                return TemperatureStatus.get_history(db_session, room=args['room'], limit=12)
         except Exception as error:
             print(error)
             abort(400, error)
     
-    return History.get_now()
+    return TemperatureStatus.get_now(db_session)
 
 
 @app.post('/api/temperature')
 def new_temp():
     # TODO: handle errors
     try:
-        entry = History(**request.get_json())
-        db.session.add(entry)
-        db.session.commit()
+        entry = TemperatureStatus(**request.get_json())
+        db_session.add(entry)
+        db_session.commit()
         return '', 201
     except Exception as error:
         print(error)
@@ -44,3 +44,7 @@ def new_temp():
 @app.errorhandler(400)
 def error400(error):
     return error, 400
+
+@app.teardown_appcontext
+def shutdown_session(exception=None):
+    db_session.remove()
