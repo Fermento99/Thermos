@@ -1,7 +1,6 @@
 from db import Base
 from sqlalchemy import Column, Boolean, DateTime, select
-from datetime import datetime
-
+from datetime import datetime, timedelta
 
 class HeatingStatus(Base):
     __tablename__ = 'heating_status'
@@ -22,6 +21,18 @@ class HeatingStatus(Base):
             .limit(1)
         ).fetchall()
         return [dict(row._mapping) for row in result][0]
+    
+    @staticmethod
+    def get_history(session, room, limit):
+        offset = datetime.now() - timedelta(hours=limit)
+        if room in HeatingStatus.__table__.columns.keys():
+            result = session.execute(
+                select(HeatingStatus.time, HeatingStatus.__table__.columns[room])
+                    .where(HeatingStatus.time > offset)
+                    .order_by(HeatingStatus.time.desc())
+                ).fetchall()
+            return [dict(row._mapping) for row in result]
+        raise NameError('room name doesn\'t exist in the database')
     
     @staticmethod
     def populate_first_entry(session):

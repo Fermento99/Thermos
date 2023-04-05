@@ -1,6 +1,6 @@
 from db import Base
 from sqlalchemy import Column, Float, DateTime, select
-import datetime
+from datetime import datetime, timedelta
 
 
 class TemperatureStatus(Base):
@@ -13,16 +13,8 @@ class TemperatureStatus(Base):
     pawel = Column(Float, nullable=False)
     michal = Column(Float, nullable=False)
 
-    def __init__(self, **kwargs) -> None:
-        if 'time' in kwargs:
-            kwargs['time'] = datetime.datetime.fromisoformat(kwargs['time'])
-        else:
-            kwargs['time'] = datetime.datetime.now()
-
-        super().__init__(**kwargs)
-    
     @staticmethod
-    def get_now(session):
+    def get_last_entry(session):
         result = session.execute(
             select(TemperatureStatus.__table__.columns)
                 .order_by(TemperatureStatus.time.desc())
@@ -32,7 +24,7 @@ class TemperatureStatus(Base):
     
     @staticmethod
     def get_history(session, room, limit):
-        offset = datetime.datetime.now() - datetime.timedelta(hours=limit)
+        offset = datetime.now() - timedelta(hours=limit)
         if room in TemperatureStatus.__table__.columns.keys():
             result = session.execute(
                 select(TemperatureStatus.time, TemperatureStatus.__table__.columns[room])

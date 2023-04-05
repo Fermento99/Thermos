@@ -1,7 +1,0 @@
-curl -X POST localhost:5000/api/temperature -H "Content-Type: application/json" -d '{
-"livingroom": 22,
-"bedroom": 21,
-"bathroom": 21,
-"pawel": 20.5,
-"michal": 20
-}'
