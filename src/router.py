@@ -5,7 +5,7 @@ from models.temperature_status import TemperatureStatus
 from models.heating_status import HeatingStatus
 
 
-app = Flask(__name__, template_folder="../frontend/build", static_folder="../frontend/build/static")
+app = Flask(__name__, template_folder="../frontend/build", static_folder="../frontend/build", static_url_path='')
 db_session = scoped_session(SessionLocal)
 
 @app.get("/")

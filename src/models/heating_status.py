@@ -20,7 +20,7 @@ class HeatingStatus(Base):
             .order_by(HeatingStatus.time.desc())
             .limit(1)
         ).fetchall()
-        return [dict(row._mapping) for row in result][0]
+        return [dict(row._mapping) for row in result]
     
     @staticmethod
     def get_history(session, room, limit):
