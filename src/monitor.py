@@ -1,8 +1,7 @@
 import datetime
 import logging
 import socket
-from models.temperature_status import TemperatureStatus
-from models.heating_status import HeatingStatus
+from models.status import Status
 from models.temperature_requirements import TemperatureRequirements
 from db import SessionLocal
 from config import get_env
@@ -141,51 +140,53 @@ def verify_and_strip(resp):
 
     return output[0:-2]
 
-def save_heating_status(session, cold_rooms, now):
-    heating_status_entry = {
-        'time': now,
+def save_status(session, cold_rooms, entry,):
+    db_entry = {
+        'time': datetime.datetime.now(),
         'heating': len(cold_rooms) != 0,
+        **entry
     }
 
     for room in OUT_ROOMS:
-        heating_status_entry[room] = True if room in cold_rooms else False
+        heating_column = '{room}_heating'.format(room=room)
+        db_entry[heating_column] = True if room in cold_rooms else False
 
-    session.add(HeatingStatus(**heating_status_entry))
+    session.add(Status(**db_entry))
     session.commit()
 
 def save_temperature_status(session, entry, now):
-    session.add(TemperatureStatus(**entry, time=now))
+    session.add(Status(**entry, time=now))
     session.commit()
 
-def read_temperature(socket):
+def read_temperatures(socket):
     entry = {}
     for room, room_config in OUT_ROOMS.items():
-        entry[room] = read_temperature(socket, room_config['temp_output'])
+        room_column = '{room}_temperature'.format(room=room)
+        entry[room_column] = read_temperature(socket, room_config['temp_output'])
     return entry
 
 def main():
     satel_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    satel_socket.connect((get_env('SATEL_HOST'), get_env('SATEL_PORT')))
+    satel_socket.connect((get_env('SATEL_HOST'), int(get_env('SATEL_PORT'))))
     db_session = SessionLocal()
-    now = datetime.datetime.now()
-
-    temperature_entry = read_temperature(satel_socket)
-    save_temperature_status(db_session, temperature_entry, now)    
+    entry = read_temperatures(satel_socket)  
 
     # get active outputs
     outData = read_outputs(satel_socket)
+    cold_rooms = []
     
     if OUT_HEATING_PI in outData:
         # heating is active
+        now = datetime.datetime.now()
         required_temperature = TemperatureRequirements.get_current_requirements(db_session, now.weekday(), now.hour)
-        cold_rooms = []
         comfort = OUT_COMFORT in outData
 
         # check if rooms need heating, save them in 'cold_rooms'
         for room, room_config in OUT_ROOMS.items():
             if room_config['active_output'] in outData:
                 offset = -0.5 if not comfort and room_config['comfort'] else 0
-                if required_temperature[room] + offset > temperature_entry[room]:
+                temperature_column = '{room}_temperature'.format(room=room)
+                if required_temperature[room] + offset > entry[temperature_column]:
                     cold_rooms.append(room)
 
         
@@ -193,15 +194,14 @@ def main():
             set_outputON(satel_socket, [OUT_START_HEATING])
             print('grzejemy: {}.'.format(', '.join(cold_rooms)))
         else:
-            last_heating_status = HeatingStatus.get_last_entry(db_session)
-            if not any([last_heating_status[room] for room in last_heating_status if room in OUT_ROOMS]):
+            last_status = Status.get_last_entry(db_session)
+            if any([last_status[room] for room in last_status if room.endswith('_heating')]):
+                print('jescze grzejemy')
+            else:
                 set_outputOFF(satel_socket, [OUT_START_HEATING])
                 print('nie grzejemy')
-            else:
-                print('jescze grzejemy')
-
-        save_heating_status(db_session, cold_rooms, now)
-            
+        
+    save_status(db_session, cold_rooms, entry)        
     satel_socket.close()
     db_session.close()
 
